@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B2B Client Enterprise Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body class="bg-slate-50 font-sans min-h-screen text-slate-800">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
+        <div>
+            <h1 class="text-lg font-black tracking-wide">📦 PINKBIKEUS</h1>
+            <p class="text-[10px] text-blue-100 uppercase font-mono tracking-wider font-bold">Wholesale Client Portal Matrix</p>
+        </div>
+        <div id="gpsStatus" class="bg-blue-700 px-3 py-1 rounded-lg text-[10px] font-mono flex items-center gap-1.5 font-bold">
+            <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span>
+            Syncing Location...
+        </div>
+    </header>
+
+    <div class="bg-slate-900 text-white p-6 grid grid-cols-2 md:grid-cols-4 gap-4 shadow-md">
+        <div class="bg-slate-800 border border-slate-700 p-3 rounded-xl shadow-inner">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Verified Capital Spend</span>
+            <span class="text-xl font-black text-emerald-400 mt-0.5 block">${{ analytics.total_spent }}</span>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-3 rounded-xl shadow-inner">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Active Pipeline Load</span>
+            <span class="text-xl font-black text-blue-400 mt-0.5 block">{{ analytics.transit }} In-Transit</span>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-3 rounded-xl shadow-inner">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Awaiting HQ Signoff</span>
+            <span class="text-xl font-black text-amber-400 mt-0.5 block">{{ analytics.pending }} Orders</span>
+        </div>
+        <div class="bg-slate-800 border border-slate-700 p-3 rounded-xl shadow-inner">
+            <span class="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Total Invoiced Units</span>
+            <span class="text-xl font-black text-purple-400 mt-0.5 block">{{ analytics.total_orders }} Transactions</span>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <div class="space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+                <h3 class="text-xs font-black uppercase text-gray-400 tracking-wider">Store Entity Context</h3>
+                <input type="text" id="shopNameInput" value="{{ shop_name }}" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500">
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col h-[55vh]">
+                <h3 class="text-sm font-black text-slate-800 uppercase tracking-wide border-b pb-2 mb-3">🛒 Quick Restock Catalog</h3>
+                <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+                    {% for p in products %}
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-3 last:border-b-0 last:pb-0">
+                        <div>
+                            <span class="font-bold text-xs text-gray-800 block">{{ p.name }}</span>
+                            <span class="text-xs font-extrabold text-blue-600">${{ "%.2f"|format(p.price) }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="changeQty('{{ p.barcode }}', '{{ p.name }}', {{ p.price }}, -1)" class="w-7 h-7 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold text-gray-600 text-xs transition">-</button>
+                            <span id="qty-{{ p.barcode }}" class="w-5 text-center text-xs font-bold text-gray-800">0</span>
+                            <button onclick="changeQty('{{ p.barcode }}', '{{ p.name }}', {{ p.price }}, 1)" class="w-7 h-7 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-bold text-xs transition">+</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="border-t pt-4 mt-3 flex justify-between items-center">
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider block font-bold">Total Matrix</span>
+                        <span id="mobileBasketTotal" class="text-lg font-black text-slate-900">$0.00</span>
+                    </div>
+                    <button onclick="transmitMobileB2BOrder()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs shadow-md transition tracking-wide">
+                        🚀 Transmit Order
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full min-h-[400px]">
+                <div class="flex justify-between items-center border-b pb-2 mb-3">
+                    <h3 class="text-xs font-black uppercase text-slate-800 tracking-wide flex items-center gap-1.5">
+                        <span class="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
+                        Live Livreur Transit Tracking Radar
+                    </h3>
+                    <span id="mapStatusText" class="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">WAITING FOR DISPATCH</span>
+                </div>
+                
+                <div id="liveLivreurMap" class="w-full flex-1 rounded-xl border border-slate-200 shadow-inner z-10"></div>
+                <span class="text-[9px] text-gray-400 font-mono text-center block mt-2" id="coordsDisplay">📍 Tracking telemetry offline</span>
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full min-h-[400px]">
+                <h3 class="text-xs font-black uppercase text-gray-400 tracking-wider border-b pb-2 mb-3">🧾 Invoice Archives & Manifest Analysis</h3>
+                <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+                    {% if not orders %}
+                    <p class="text-gray-400 text-xs text-center py-12">No transaction invoices processed for this terminal.</p>
+                    {% else %}
+                        {% for order in orders %}
+                        <div class="p-3 border rounded-xl bg-slate-50 border-gray-100 flex justify-between items-center transition-all hover:bg-slate-100">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-xs text-slate-900 font-mono">Inv #{{ order.id }}</span>
+                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded 
+                                        {% if order.status == 'Pending' %}bg-amber-100 text-amber-800
+                                        {% elif order.status == 'Completed' %}bg-blue-100 text-blue-800 animate-pulse
+                                        {% else %}bg-emerald-100 text-emerald-800{% endif %}">
+                                        {{ order.status }}
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-600 font-medium leading-relaxed">{{ order.items_summary }}</p>
+                                <span class="text-[9px] text-gray-400 block">{{ order.timestamp.strftime('%Y-%m-%d %H:%M') }}</span>
+                            </div>
+                            <span class="font-black text-xs text-slate-900">${{ "%.2f"|format(order.total_price) }}</span>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        let mobileCart = {};
+        let geoCoordinates = { lat: 34.0333, lng: -5.0000 };
+        
+        let deliveryMap = null;
+        let livreurMarker = null;
+        let telemetryPollEngine = null;
+
+        // Check if there are active in-transit manifests within the template on load
+        const hasActiveTransit = {{ analytics.transit }};
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    geoCoordinates.lat = position.coords.latitude;
+                    geoCoordinates.lng = position.coords.longitude;
+                    document.getElementById('gpsStatus').innerHTML = `<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Client Base Synced`;
+                    document.getElementById('gpsStatus').className = "bg-emerald-950 text-emerald-400 px-2 py-1 rounded text-[10px] font-mono flex items-center gap-1 font-bold";
+                    document.getElementById('coordsDisplay').innerText = `📍 Base Coordinates Lat: ${geoCoordinates.lat.toFixed(4)}, Lng: ${geoCoordinates.lng.toFixed(4)}`;
+                },
+                (error) => {
+                    document.getElementById('gpsStatus').innerText = "⚠️ Default Base Frame Connected";
+                }
+            );
+        }
+
+        function changeQty(barcode, name, price, modifier) {
+            if (!mobileCart[barcode]) {
+                mobileCart[barcode] = { name: name, price: price, qty: 0 };
+            }
+            mobileCart[barcode].qty += modifier;
+            if (mobileCart[barcode].qty < 0) mobileCart[barcode].qty = 0;
+            document.getElementById(`qty-${barcode}`).innerText = mobileCart[barcode].qty;
+            calculateSummary();
+        }
+
+        function calculateSummary() {
+            let runningSum = 0;
+            Object.values(mobileCart).forEach(item => { runningSum += item.price * item.qty; });
+            document.getElementById('mobileBasketTotal').innerText = `$${runningSum.toFixed(2)}`;
+            return runningSum;
+        }
+
+        async function transmitMobileB2BOrder() {
+            const finalPrice = calculateSummary();
+            if (finalPrice <= 0) return alert("Select products to include inside layout frame payload first!");
+
+            let summaryString = Object.values(mobileCart)
+                .filter(item => item.qty > 0)
+                .map(item => `${item.qty}x ${item.name}`).join(', ');
+
+            let payload = new FormData();
+            payload.append('shop_name', document.getElementById('shopNameInput').value);
+            payload.append('items_summary', summaryString);
+            payload.append('total_price', finalPrice);
+            payload.append('latitude', geoCoordinates.lat);
+            payload.append('longitude', geoCoordinates.lng);
+
+            try {
+                const response = await fetch('/api/submit-mobile-order', { method: 'POST', body: payload });
+                if (response.ok) {
+                    alert("✨ Order securely logged inside wholesale central grid!");
+                    location.reload();
+                }
+            } catch (err) { alert("Network payload delivery error."); }
+        }
+
+        // 🗺️ Leaflet Mapping Engine Renderer
+        function initLiveTrackingMap(initialLat, initialLng) {
+            deliveryMap = L.map('liveLivreurMap', { zoomControl: false }).setView([initialLat, initialLng], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(deliveryMap);
+
+            const truckIcon = L.divIcon({
+                html: '<div class="flex items-center justify-center bg-white border-2 border-blue-500 rounded-full w-8 h-8 shadow-md animate-bounce text-sm">🚚</div>',
+                iconSize: [32, 32], iconAnchor: [16, 16]
+            });
+
+            livreurMarker = L.marker([initialLat, initialLng], { icon: truckIcon }).addTo(deliveryMap);
+            document.getElementById('mapStatusText').innerText = "📡 LIVREUR LIVE RADAR";
+            document.getElementById('mapStatusText').className = "text-[9px] font-mono font-bold bg-emerald-500 text-white px-2 py-0.5 rounded";
+        }
+
+        async function pollLivreurLocation() {
+            try {
+                const res = await fetch('/api/get-livreur-gps');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (!deliveryMap) {
+                        initLiveTrackingMap(data.latitude, data.longitude);
+                    } else {
+                        const targetLatLng = new L.LatLng(data.latitude, data.longitude);
+                        livreurMarker.setLatLng(targetLatLng);
+                        deliveryMap.panTo(targetLatLng);
+                    }
+                }
+            } catch (err) { console.log("Telemetry drop bounce."); }
+        }
+
+        // Initialize tracking loop only if active shipments exist in transit pipeline
+        if (hasActiveTransit > 0) {
+            pollLivreurLocation();
+            telemetryPollEngine = setInterval(pollLivreurLocation, 5000);
+        } else {
+            // Render a clean structural fallback baseline layout frame map if no active trucks run
+            window.onload = () => initLiveTrackingMap(34.0333, -5.0000);
+        }
+    </script>
+</body>
+</html>

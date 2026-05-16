@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cashier Counter POS Station</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 font-sans min-h-screen grid grid-cols-1 md:grid-cols-3">
+
+    <div class="md:col-span-2 p-6 space-y-4 max-h-screen overflow-y-auto">
+        <div class="flex justify-between items-center border-b pb-3 border-slate-200">
+            <div>
+                <h1 class="text-xl font-black text-slate-900 tracking-wide">💻 Counter POS Station</h1>
+                <p class="text-[11px] text-gray-400 font-mono uppercase tracking-widest">In-Store Cash Sales Terminal</p>
+            </div>
+            <a href="/" class="text-xs font-bold text-gray-500 bg-white border px-3 py-1.5 rounded-lg hover:bg-slate-50 transition">Logout</a>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {% for p in products %}
+            <button onclick="addItemToCart('{{ p.barcode }}', '{{ p.name }}', {{ p.price }})" class="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm text-left hover:border-blue-500 hover:shadow-md transition flex flex-col justify-between min-h-[110px]">
+                <div>
+                    <span class="text-xs font-black text-slate-900 block truncate">{{ p.name }}</span>
+                    <span class="text-[10px] text-gray-400 font-mono block mt-0.5">Stock: {{ p.stock }} units</span>
+                </div>
+                <div class="flex justify-between items-center w-full mt-2">
+                    <span class="text-[10px] text-slate-400 font-mono">#{{ p.barcode }}</span>
+                    <span class="text-sm font-black text-blue-600">${{ "%.2f"|format(p.price) }}</span>
+                </div>
+            </button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="bg-white border-t md:border-t-0 md:border-l border-gray-200 p-6 flex flex-col justify-between max-h-screen">
+        <div class="flex flex-col h-[75vh]">
+            <h3 class="text-xs font-black uppercase text-gray-400 tracking-widest border-b pb-3 mb-4 flex items-center gap-2">
+                🛒 Active Transaction Basket
+            </h3>
+            
+            <div id="cartItemsList" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                <p class="text-center text-xs text-gray-300 py-24 font-medium" id="emptyCartMessage">Scan barcode or select catalog products to open cart.</p>
+            </div>
+        </div>
+
+        <div class="border-t pt-4 space-y-3">
+            <div class="flex justify-between items-center">
+                <div>
+                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Tax Total (Incl. 8% VAT)</span>
+                    <span id="cartGrandTotal" class="text-2xl font-black text-slate-900">$0.00</span>
+                </div>
+            </div>
+            <button onclick="processPOSCheckout()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl text-center shadow-lg transition tracking-wide text-sm">
+                ⚡ Finalize Sale & Open Drawer
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let posCart = {};
+
+        function addItemToCart(barcode, name, price) {
+            document.getElementById('emptyCartMessage').style.display = 'none';
+            if (!posCart[barcode]) {
+                posCart[barcode] = { name: name, price: price, qty: 0 };
+            }
+            posCart[barcode].qty += 1;
+            renderCartList();
+        }
+
+        function modifyCartQty(barcode, modifier) {
+            if (!posCart[barcode]) return;
+            posCart[barcode].qty += modifier;
+            if (posCart[barcode].qty <= 0) delete posCart[barcode];
+            renderCartList();
+        }
+
+        function renderCartList() {
+            const list = document.getElementById('cartItemsList');
+            list.innerHTML = '';
+            
+            let total = 0;
+            const entries = Object.entries(posCart);
+            
+            if (entries.length === 0) {
+                document.getElementById('emptyCartMessage').style.display = 'block';
+                document.getElementById('cartGrandTotal').innerText = "$0.00";
+                return;
+            }
+
+            entries.forEach(([barcode, item]) => {
+                let cost = item.price * item.qty;
+                total += cost;
+                
+                list.innerHTML += `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 border rounded-xl text-xs shadow-inner">
+                        <div class="space-y-0.5">
+                            <span class="font-bold text-slate-900 block">${item.name}</span>
+                            <span class="text-[10px] text-blue-600 font-bold">${item.qty}x @ $${item.price.toFixed(2)}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="modifyCartQty('${barcode}', -1)" class="w-6 h-6 bg-white border border-gray-200 hover:bg-gray-100 font-bold rounded-lg transition">-</button>
+                            <button onclick="modifyCartQty('${barcode}', 1)" class="w-6 h-6 bg-blue-600 text-white hover:bg-blue-700 font-bold rounded-lg transition">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // Apply 8% VAT configuration to the display tally lines
+            document.getElementById('cartGrandTotal').innerText = `$${(total * 1.08).toFixed(2)}`;
+        }
+
+        async function processPOSCheckout() {
+            if (Object.keys(posCart).length === 0) return alert("Select products to initiate a sale sequence!");
+            
+            let payload = new FormData();
+            
+            // Format basket data into structured array layouts for database columns
+            let cartDataArray = Object.entries(posCart).map(([barcode, item]) => ({
+                barcode: barcode,
+                qty: item.qty
+            }));
+            
+            payload.append('cart', JSON.stringify(cartDataArray));
+
+            try {
+                const response = await fetch('/api/checkout', { method: 'POST', body: payload });
+                if (response.ok) {
+                    alert("✨ In-store sale registered successfully! Receipt printed.");
+                    posCart = {};
+                    renderCartList();
+                }
+            } catch (err) { alert("Database ledger sync timeout."); }
+        }
+    </script>
+</body>
+</html>
