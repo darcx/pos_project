@@ -5,8 +5,3 @@ services:
     repo: https://github.com/darcx/pos_project
     branch: main
     plan: free
-    # Link a persistent disk space so your SQLite database (pos.db) is preserved during updates
-    disk:
-      name: pos-db-storage
-      mountPath: /app/data
-      sizeGB: 1
